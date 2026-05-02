@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import time
-import datetime
+from datetime import datetime
 
 from context_store import store
 from decision_engine import DecisionEngine
@@ -20,69 +21,56 @@ app.add_middleware(
 )
 START_TIME = time.time()
 
+# Link to the global store's internal dictionary to satisfy the user's exact logic
+context_store = store.store
+
+class ContextRequest(BaseModel):
+    scope: str
+    context_id: str
+    version: int
+    payload: Dict[str, Any]
+    delivered_at: Optional[str] = None
+
+class TickPayload(BaseModel):
+    now: str
+    available_triggers: List[Any]
+
+class ReplyPayload(BaseModel):
+    conversation_id: str
+    message: str
+    turn_number: Optional[int] = 1
+
 @app.post("/v1/context")
-async def update_context(request: Request):
-    # Flexible schema: accept ANY JSON to satisfy judge requirements
-    try:
-        req = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+def add_context(req: ContextRequest):
+    # ensure scope exists
+    if req.scope not in context_store:
+        context_store[req.scope] = {}
 
-    scope = req.get("scope")
-    context_id = req.get("context_id")
-    version = req.get("version")
-    payload = req.get("payload")
+    existing = context_store[req.scope].get(req.context_id)
 
-    if not all([scope, context_id, payload]):
-        # Fallback check: maybe it's using 'id' instead of 'context_id'?
-        context_id = context_id or req.get("id")
-        if not all([scope, context_id, payload]):
-            raise HTTPException(status_code=400, detail="Missing required fields: scope, context_id/id, payload")
+    # version handling (important)
+    if existing is None or req.version > existing["version"]:
+        context_store[req.scope][req.context_id] = {
+            "version": req.version,
+            "data": req.payload
+        }
 
-    if scope not in ["merchant", "category", "customer", "trigger"]:
-        raise HTTPException(status_code=400, detail="Invalid scope.")
-        
-    updated = store.update_context(
-        scope, 
-        context_id, 
-        int(version) if version is not None else 1, 
-        payload
-    )
-    
     return {
-        "accepted": True, 
-        "updated": updated,
-        "ack_id": f"ack_{context_id}",
-        "stored_at": datetime.datetime.now(datetime.UTC).isoformat()
+        "accepted": True,
+        "ack_id": f"ack_{req.scope}_{req.context_id}",
+        "stored_at": datetime.utcnow().isoformat() + "Z"
     }
 
 @app.post("/v1/tick")
-async def process_tick(request: Request):
-    try:
-        req = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    now = req.get("now", datetime.datetime.now(datetime.UTC).isoformat())
-    available_triggers = req.get("available_triggers", [])
-    
+def process_tick(req: TickPayload):
     # This plugs into DecisionEngine
-    actions = DecisionEngine.process_tick(now, available_triggers)
+    actions = DecisionEngine.process_tick(req.now, req.available_triggers)
     return {"actions": actions}
 
 @app.post("/v1/reply")
-async def handle_reply_endpoint(request: Request):
-    try:
-        req = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    message = req.get("message", "")
-    conversation_id = req.get("conversation_id", "unknown")
-    turn_number = req.get("turn_number", 1)
-    
+def handle_reply_endpoint(req: ReplyPayload):
     # Deterministic reply handler
-    action = handle_reply(message, conversation_id, int(turn_number))
+    action = handle_reply(req.message, req.conversation_id, req.turn_number)
     return action
 
 @app.get("/")
