@@ -47,7 +47,7 @@ def update_context(req: ContextPayload):
         req.payload
     )
     
-    return {"success": True, "updated": updated}
+    return {"accepted": True, "updated": updated}
 
 @app.post("/v1/tick")
 def process_tick(req: TickPayload):
