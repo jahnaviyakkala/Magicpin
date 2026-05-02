@@ -7,8 +7,17 @@ from context_store import store
 from decision_engine import DecisionEngine
 from merchant_reply_handler import handle_reply
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Magicpin AI Challenge Backend")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 START_TIME = time.time()
 
 class ContextPayload(BaseModel):
