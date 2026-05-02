@@ -14,10 +14,10 @@ def handle_reply(reply_message: str, conversation_id: str, turn_number: int) -> 
     
     accept_keywords = ["yes", "do it", "sure", "ok", "okay", "proceed", "go ahead", "sounds good", "please", "yep"]
     reject_keywords = ["no", "not now", "later", "nah", "nope", "don't", "cancel"]
-    clarify_keywords = ["what", "how", "explain", "why", "details", "more info", "meaning", "?"]
+    clarify_keywords = ["what", "how", "explain", "why", "details", "more info", "meaning", "how?", "why?"]
     hostile_keywords = ["stop", "irrelevant", "annoying", "spam", "unsubscribe", "shut up", "leave me alone", "bad"]
     
-    # Matching sequence matters: Check hostile/clarify first, as a user might say "no wait, what does that mean?"
+    # Matching sequence matters
     if any(word in text.split() for word in hostile_keywords) or any(phrase in text for phrase in ["stop", "leave me alone"]):
         intent = "hostile"
     elif any(word in text.split() for word in clarify_keywords) or "?" in text:
@@ -34,33 +34,35 @@ def handle_reply(reply_message: str, conversation_id: str, turn_number: int) -> 
 
     if intent == "accept":
         action = "send"
-        # Confirm action + suggest next step
         body = "Great, I've started that process for you. Would you like me to send you a quick summary once it's finished?"
-        rationale += " Proceeding with action and prompting for the next step."
+        rationale += " Proceeding with action and prompting for next step."
         
     elif intent == "reject":
         action = "end"
-        # Polite exit
         body = "Understood. We'll hold off for now. Have a great day!"
         rationale += " Ending conversation gracefully per rejection."
         
     elif intent == "clarify":
         action = "send"
-        # Explain briefly + re-offer
-        body = "This action optimizes your metrics to ensure you capture maximum local demand. Shall we go ahead and apply it?"
-        rationale += " Providing brief context and re-offering the choice."
+        # Sharp, high-compulsion response to clarification
+        body = "This optimization is designed to instantly improve your visibility and convert more profile views into walk-ins. Should I activate it for you now?"
+        rationale += " Providing sharp context and re-offering the choice."
         
     elif intent == "hostile":
         action = "end"
-        # De-escalate and end
         body = "I apologize for any inconvenience. I will stop messaging you now."
         rationale += " Immediate de-escalation and termination of the flow."
         
     else:  # unknown
-        action = "wait"
-        # Unknown -> wait (do not send a message)
-        body = ""  
-        rationale += " No clear intent recognized; pausing for human review or clearer input."
+        # Detect potential auto-replies or infinite loops
+        if turn_number >= 4:
+            action = "end"
+            body = ""
+            rationale += " Maximum turns reached without clear intent; ending to prevent infinite loop."
+        else:
+            action = "wait"
+            body = ""  
+            rationale += " No clear intent recognized; pausing for human review."
 
     return {
         "action": action,
