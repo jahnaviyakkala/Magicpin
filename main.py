@@ -61,6 +61,10 @@ def handle_reply_endpoint(req: ReplyPayload):
     action = handle_reply(req.message, req.conversation_id, req.turn_number)
     return action
 
+@app.get("/")
+def root():
+    return {"message": "Magicpin bot is running"}
+
 @app.get("/v1/healthz")
 def healthz():
     uptime = time.time() - START_TIME
