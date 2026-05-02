@@ -79,8 +79,10 @@ def healthz():
 def metadata():
     return {
         "team_name": "Magicpin AI Challengers",
-        "version": "1.0.0",
-        "description": "Deterministic engagement backend"
+        "team_members": ["Jahnavi", "Lokesh"],
+        "model": "deterministic-rule-engine",
+        "approach": "rule-based decision engine using merchant + trigger prioritization",
+        "version": "1.0.0"
     }
 
 if __name__ == "__main__":
