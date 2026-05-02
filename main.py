@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import time
+import datetime
 
 from context_store import store
 from decision_engine import DecisionEngine
@@ -47,7 +48,12 @@ def update_context(req: ContextPayload):
         req.payload
     )
     
-    return {"accepted": True, "updated": updated}
+    return {
+        "accepted": True, 
+        "updated": updated,
+        "ack_id": f"ack_{req.context_id}",
+        "stored_at": datetime.datetime.now(datetime.UTC).isoformat()
+    }
 
 @app.post("/v1/tick")
 def process_tick(req: TickPayload):
